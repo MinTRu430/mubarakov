@@ -1,0 +1,36 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Регистрация</title>
+</head>
+<body>
+    <h1>Регистрация</h1>
+    <form id="regForm">
+        <input type="text" name="login" placeholder="Логин"><br>
+        <input type="password" name="password" placeholder="Пароль"><br>
+        <input type="text" name="tg_login" placeholder="Telegram логин"><br>
+        <button type="submit">Зарегистрироваться</button>
+    </form>
+
+    <script>
+        document.getElementById("regForm").addEventListener("submit", async (e) => {
+            e.preventDefault();
+            const data = {
+                login: e.target.login.value,
+                password: e.target.password.value,
+                tg_login: e.target.tg_login.value
+            };
+
+            const res = await fetch("/register", {
+                method: "POST",
+                headers: {"Content-Type": "application/json"},
+                body: JSON.stringify(data)
+            });
+
+            const result = await res.json();
+            alert(JSON.stringify(result));
+        });
+    </script>
+</body>
+</html>

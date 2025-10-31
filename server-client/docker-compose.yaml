@@ -1,0 +1,18 @@
+version: '3.8'
+
+services:
+  db-client-mubarakov:
+    image: postgres:15
+    container_name: db-client-mubarakov
+    environment:
+      POSTGRES_USER: user
+      POSTGRES_PASSWORD: password
+      POSTGRES_DB: duck
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data        
+      - ./_postgresql/:/docker-entrypoint-initdb.d/   
+
+volumes:
+  postgres_data:
