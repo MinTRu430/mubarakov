@@ -131,17 +131,9 @@ func (h *Handler) Finish(w http.ResponseWriter, r *http.Request) {
 	md5hash := md5.Sum(data)
 	wHash := hex.EncodeToString(md5hash[:])
 
-	//добавление диффи в базу
-
 	err = h.service.repo.SaveDiffe(ctx, req.Login, A.String(), a.String(), p.String())
 	if err != nil {
 		utils.WriteJSONError(w, http.StatusInternalServerError, "failed to added diffe to base: "+err.Error())
-		return
-	}
-	// добавление подписи в базу
-	err = h.service.repo.UpdateSign(ctx, req.Login, signature)
-	if err != nil {
-		utils.WriteJSONError(w, http.StatusInternalServerError, "failed to updated signature to base: "+err.Error())
 		return
 	}
 

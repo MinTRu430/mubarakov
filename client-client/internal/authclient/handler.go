@@ -33,18 +33,41 @@ func (h *Handler) StartAuth(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(AuthStartResponse{CodeWord: codeWord})
 }
 
-func (h *Handler) FinishAuth(w http.ResponseWriter, r *http.Request) {
-	var req AuthFinishRequest
+type FinishAuthWebRequest struct {
+	Login      string `json:"login"`
+	Password   string `json:"password"`
+	TgCode     string `json:"tg_code"`
+	CodeWord   string `json:"code_word"`
+	PrivateKey string `json:"private_key"`
+}
+
+type FinishAuthWebResponse struct {
+	OK      bool   `json:"ok"`
+	Message string `json:"message"`
+}
+
+func (h *Handler) FinishAuthWeb(w http.ResponseWriter, r *http.Request) {
+	var req FinishAuthWebRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		log.Println("bad request: ", err)
 		utils.WriteJSONError(w, http.StatusBadRequest, "bad request")
 		return
 	}
 
-	_, err := h.service.FinishAuth(req.Login, req.MultiHash, req.MultiHash, req.MultiHash)
-	if err != nil {
-		log.Println("finish auth err: ", err)
-		utils.WriteJSONError(w, http.StatusInternalServerError, "finish auth err"+err.Error())
+	if req.Login == "" || req.Password == "" || req.TgCode == "" || req.CodeWord == "" || req.PrivateKey == "" {
+		utils.WriteJSONError(w, http.StatusBadRequest, "login, password, tg_code, code_word, private_key required")
 		return
 	}
+
+	message, _, err := h.service.FinishAuthWithRSA(req.Login, req.Password, req.CodeWord, req.TgCode, req.PrivateKey)
+	if err != nil {
+		log.Println("finish auth web err: ", err)
+		utils.WriteJSONError(w, http.StatusInternalServerError, "finish auth err: "+err.Error())
+		return
+	}
+
+	json.NewEncoder(w).Encode(FinishAuthWebResponse{
+		OK:      true,
+		Message: message,
+	})
 }

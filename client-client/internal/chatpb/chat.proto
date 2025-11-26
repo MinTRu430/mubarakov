@@ -1,0 +1,22 @@
+syntax = "proto3";
+
+package chatpb;
+
+option go_package = "client-client/internal/chatpb;chatpb";
+
+message ClientMessage {
+  string login = 1;
+  string ciphertext = 2;
+  int64 timestamp = 3;
+}
+
+message ServerMessage {
+  string from = 1;
+  string ciphertext = 2;
+  int64 timestamp = 3;
+  bool is_history = 4;
+}
+
+service ChatService {
+  rpc Chat(stream ClientMessage) returns (stream ServerMessage);
+}

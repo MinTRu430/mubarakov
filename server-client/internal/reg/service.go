@@ -17,25 +17,56 @@ func NewService(repo *Repository) *Service {
 	return &Service{repo: repo}
 }
 
-func (s *Service) RegisterUser(ctx context.Context, login, password, tgLogin string) (int, error) {
+func (s *Service) RegisterUser(ctx context.Context, login, password, tgLogin string) (int, string, error) {
 	if err := validateLogin(login); err != nil {
-		return 0, err
+		return 0, "", err
 	}
 
 	if err := validatePassword(password); err != nil {
-		return 0, err
+		return 0, "", err
 	}
 
 	hashedPass := utils.HashMD5(password)
 
 	if err := validateTelegram(tgLogin); err != nil {
-		return 0, err
+		return 0, "", err
+	}
+
+	// генерируем RSA-ключи
+	pubPEM, privPEM, err := utils.GenerateRSAKeyPairPEM(2048)
+	if err != nil {
+		return 0, "", err
 	}
 
 	ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
 	defer cancel()
 
-	return s.repo.InsertUser(ctx, login, hashedPass, tgLogin)
+	id, err := s.repo.InsertUser(ctx, login, hashedPass, tgLogin, pubPEM)
+	if err != nil {
+		return 0, "", err
+	}
+
+	return id, privPEM, nil
+}
+
+func (s *Service) RegenerateRSAForUser(ctx context.Context, login string) (string, error) {
+	if err := validateLogin(login); err != nil {
+		return "", err
+	}
+
+	pubPEM, privPEM, err := utils.GenerateRSAKeyPairPEM(2048)
+	if err != nil {
+		return "", err
+	}
+
+	ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
+	defer cancel()
+
+	if err := s.repo.UpdateRSAPublicByLogin(ctx, login, pubPEM); err != nil {
+		return "", err
+	}
+
+	return privPEM, nil
 }
 
 func validateLogin(login string) error {

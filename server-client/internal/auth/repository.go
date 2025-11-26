@@ -2,7 +2,6 @@ package auth
 
 import (
 	"context"
-	"encoding/base64"
 	"log"
 	"time"
 
@@ -64,10 +63,4 @@ func (r *Repository) SaveDiffe(ctx context.Context, login, aValue, aPrivate, pVa
 
 	log.Printf("Diffie-Hellman params saved for user: %s", login)
 	return nil
-}
-
-func (r *Repository) UpdateSign(ctx context.Context, login string, rsa_signature []byte) error {
-	encoded := base64.StdEncoding.EncodeToString(rsa_signature)
-	_, err := r.db.Exec(ctx, "UPDATE users SET rsa_signature = $1 WHERE login = $2", encoded, login)
-	return err
 }

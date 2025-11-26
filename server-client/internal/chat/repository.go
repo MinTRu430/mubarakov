@@ -29,3 +29,13 @@ func (r *Repository) GetDHParams(ctx context.Context, login string) (DHParams, e
 	`, login).Scan(&params.A, &params.P, &params.APriv)
 	return params, err
 }
+
+func (r *Repository) GetUserRSAPublicKey(ctx context.Context, login string) (string, error) {
+	var pub string
+	err := r.db.QueryRow(ctx, `
+		SELECT rsa_signature
+		FROM users
+		WHERE login = $1
+	`, login).Scan(&pub)
+	return pub, err
+}

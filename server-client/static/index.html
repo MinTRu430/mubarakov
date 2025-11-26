@@ -1,36 +1,418 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="ru">
 <head>
     <meta charset="UTF-8">
-    <title>Регистрация</title>
+    <title>Админка: регистрация, ключи и чаты</title>
+    <style>
+        body {
+            font-family: sans-serif;
+            margin: 20px;
+        }
+        h1, h2, h3 {
+            margin-bottom: 8px;
+        }
+        form {
+            margin-bottom: 16px;
+        }
+        input, textarea, button {
+            margin-top: 4px;
+            margin-bottom: 4px;
+        }
+        textarea {
+            width: 100%;
+            box-sizing: border-box;
+            font-family: monospace;
+            font-size: 12px;
+        }
+        .section {
+            margin-bottom: 24px;
+        }
+        .status {
+            font-size: 13px;
+            margin-top: 4px;
+        }
+
+        /* верхняя часть: регистрация + RSA в один ряд */
+        .top-sections {
+            display: flex;
+            gap: 32px;
+            align-items: flex-start;
+            margin-bottom: 24px;
+        }
+        .top-section {
+            flex: 1;
+            min-width: 0; /* чтобы textarea ужимались */
+        }
+
+        .chat-container {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 16px;
+            margin-top: 20px;
+        }
+        .chat-box {
+            border: 1px solid #ccc;
+            padding: 10px;
+            width: 280px;
+            border-radius: 6px;
+            box-shadow: 0 0 4px rgba(0,0,0,0.05);
+        }
+        .chat-box h3 {
+            margin-top: 0;
+            font-size: 16px;
+        }
+        .messages {
+            border: 1px solid #eee;
+            height: 150px;
+            overflow-y: auto;
+            margin-bottom: 8px;
+            padding: 4px;
+            background: #fafafa;
+            font-size: 14px;
+        }
+        .msg-line {
+            margin: 2px 0;
+        }
+        .msg-line span.from {
+            font-weight: bold;
+        }
+        .msg-line span.time {
+            font-size: 10px;
+            color: #666;
+            margin-left: 4px;
+        }
+    </style>
 </head>
 <body>
-    <h1>Регистрация</h1>
-    <form id="regForm">
-        <input type="text" name="login" placeholder="Логин"><br>
-        <input type="password" name="password" placeholder="Пароль"><br>
-        <input type="text" name="tg_login" placeholder="Telegram логин"><br>
-        <button type="submit">Зарегистрироваться</button>
-    </form>
+    <h1>Админка Mubarakov</h1>
+
+    <!-- ========= ВЕРХ: регистрация + RSA в один ряд ========= -->
+    <div class="top-sections">
+        <!-- ========== Регистрация ========== -->
+        <div class="section top-section">
+            <h2>Регистрация пользователя</h2>
+            <form id="regForm">
+                <input type="text" name="login" placeholder="Логин"><br>
+                <input type="password" name="password" placeholder="Пароль"><br>
+                <input type="text" name="tg_login" placeholder="Telegram логин (@user)"><br>
+                <button type="submit">Зарегистрировать</button>
+            </form>
+            <div id="regStatus" class="status"></div>
+
+            <h3>Приватный RSA-ключ (передайте клиенту и сохраните)</h3>
+            <textarea id="regPrivateKey" rows="8" readonly
+                      placeholder="После регистрации здесь появится приватный ключ"></textarea>
+            <small><br>⚠️ Сервер приватный ключ НЕ хранит, он есть только в этом ответе.</small>
+        </div>
+
+        <!-- ========== RSA управление ========== -->
+        <div class="section top-section">
+            <h2>Управление RSA-ключами пользователя</h2>
+            <p>Если клиент потерял свой приватный ключ — можно сгенерировать новый. Публичный ключ в БД обновится, приватный нужно забрать отсюда и отдать клиенту.</p>
+
+            <input type="text" id="rsaLogin" placeholder="Логин пользователя"><br>
+            <button id="rsaRegenBtn">Перегенерировать ключи</button>
+            <div id="rsaStatus" class="status"></div>
+
+            <h3>Новый приватный RSA-ключ</h3>
+            <textarea id="rsaPrivateKey" rows="8" readonly
+                      placeholder="Здесь появится новый приватный ключ после перегенерации"></textarea>
+            <small><br>⚠️ Старый приватный ключ станет недействительным, подписи нужно будет делать этим новым.</small>
+        </div>
+    </div>
+
+    <hr>
+
+    <!-- ========== Чаты ========== -->
+    <div class="section">
+        <h2>Активные чаты</h2>
+        <p>Когда клиент подключается по gRPC, здесь автоматически появляется окно чата именно с ним.</p>
+
+        <div id="chatContainer" class="chat-container"></div>
+    </div>
 
     <script>
-        document.getElementById("regForm").addEventListener("submit", async (e) => {
+        // ===================== Регистрация =====================
+
+        const regForm = document.getElementById("regForm");
+        const regStatus = document.getElementById("regStatus");
+        const regPrivateKey = document.getElementById("regPrivateKey");
+
+        regForm.addEventListener("submit", async (e) => {
             e.preventDefault();
             const data = {
-                login: e.target.login.value,
-                password: e.target.password.value,
-                tg_login: e.target.tg_login.value
+                login: regForm.login.value.trim(),
+                password: regForm.password.value.trim(),
+                tg_login: regForm.tg_login.value.trim(),
             };
 
-            const res = await fetch("/register", {
-                method: "POST",
-                headers: {"Content-Type": "application/json"},
-                body: JSON.stringify(data)
+            if (!data.login || !data.password || !data.tg_login) {
+                regStatus.textContent = "Заполните все поля";
+                regStatus.style.color = "red";
+                return;
+            }
+
+            regStatus.textContent = "Отправка запроса...";
+            regStatus.style.color = "black";
+            regPrivateKey.value = "";
+
+            try {
+                const res = await fetch("/register", {
+                    method: "POST",
+                    headers: {"Content-Type": "application/json"},
+                    body: JSON.stringify(data)
+                });
+
+                const result = await res.json();
+
+                if (!res.ok) {
+                    regStatus.textContent = "Ошибка регистрации: " + (result.error || JSON.stringify(result));
+                    regStatus.style.color = "red";
+                    return;
+                }
+
+                regStatus.textContent = "Пользователь зарегистрирован, id=" + result.userId;
+                regStatus.style.color = "green";
+
+                if (result.private_key) {
+                    regPrivateKey.value = result.private_key;
+                } else {
+                    regPrivateKey.value = "Сервер не вернул приватный ключ.";
+                }
+            } catch (err) {
+                regStatus.textContent = "Ошибка запроса: " + err;
+                regStatus.style.color = "red";
+            }
+        });
+
+        // ===================== RSA перегенерация =====================
+
+        const rsaLoginInput  = document.getElementById("rsaLogin");
+        const rsaRegenBtn    = document.getElementById("rsaRegenBtn");
+        const rsaStatus      = document.getElementById("rsaStatus");
+        const rsaPrivateKey  = document.getElementById("rsaPrivateKey");
+
+        rsaRegenBtn.addEventListener("click", async () => {
+            const login = rsaLoginInput.value.trim();
+            if (!login) {
+                rsaStatus.textContent = "Введите логин";
+                rsaStatus.style.color = "red";
+                return;
+            }
+
+            rsaStatus.textContent = "Генерируем новую пару ключей...";
+            rsaStatus.style.color = "black";
+            rsaPrivateKey.value = "";
+
+            try {
+                const res = await fetch("/reg/rsa/regenerate", {
+                    method: "POST",
+                    headers: {"Content-Type": "application/json"},
+                    body: JSON.stringify({ login })
+                });
+
+                const result = await res.json();
+
+                if (!res.ok) {
+                    rsaStatus.textContent = "Ошибка перегенерации: " + (result.error || JSON.stringify(result));
+                    rsaStatus.style.color = "red";
+                    return;
+                }
+
+                rsaStatus.textContent = "Новый ключ сгенерирован для логина: " + result.login;
+                rsaStatus.style.color = "green";
+
+                if (result.private_key) {
+                    rsaPrivateKey.value = result.private_key;
+                } else {
+                    rsaPrivateKey.value = "Сервер не вернул приватный ключ.";
+                }
+            } catch (err) {
+                rsaStatus.textContent = "Ошибка запроса: " + err;
+                rsaStatus.style.color = "red";
+            }
+        });
+
+        // ===================== Чаты (динамические окна) =====================
+
+        const chatContainer = document.getElementById("chatContainer");
+        const openChats = new Map(); // login -> { root, messagesDiv, input }
+
+        function createChatBox(login) {
+            if (openChats.has(login)) {
+                return openChats.get(login);
+            }
+
+            const root = document.createElement("div");
+            root.className = "chat-box";
+
+            const title = document.createElement("h3");
+            title.textContent = "Чат с: " + login;
+            root.appendChild(title);
+
+            const messagesDiv = document.createElement("div");
+            messagesDiv.className = "messages";
+            messagesDiv.dataset.login = login;
+            root.appendChild(messagesDiv);
+
+            const input = document.createElement("input");
+            input.type = "text";
+            input.placeholder = "Сообщение...";
+            input.style.width = "100%";
+            root.appendChild(input);
+
+            const sendBtn = document.createElement("button");
+            sendBtn.textContent = "Отправить";
+            sendBtn.style.marginTop = "6px";
+            root.appendChild(document.createElement("br"));
+            root.appendChild(sendBtn);
+
+            sendBtn.addEventListener("click", async () => {
+                const text = input.value.trim();
+                if (!text) return;
+
+                const payload = { login, message: text };
+
+                try {
+                    const res = await fetch("/chat/server/send", {
+                        method: "POST",
+                        headers: {"Content-Type": "application/json"},
+                        body: JSON.stringify(payload)
+                    });
+
+                    const result = await res.json();
+                    if (!res.ok) {
+                        alert("Ошибка отправки: " + (result.error || JSON.stringify(result)));
+                        return;
+                    }
+
+                    // сообщение попадёт в Redis и прилетит по WebSocket
+                    input.value = "";
+                } catch (err) {
+                    alert("Ошибка отправки: " + err);
+                }
             });
 
-            const result = await res.json();
-            alert(JSON.stringify(result));
-        });
+            chatContainer.appendChild(root);
+            const chatObj = { root, messagesDiv, input };
+            openChats.set(login, chatObj);
+
+            // при первом создании сразу подтягиваем историю
+            loadHistory(login);
+
+            return chatObj;
+        }
+
+        function appendMessage(login, from, text, ts) {
+            if (!openChats.has(login)) {
+                createChatBox(login);
+            }
+            const chat = openChats.get(login);
+
+            const div = document.createElement("div");
+            div.className = "msg-line";
+
+            const fromSpan = document.createElement("span");
+            fromSpan.className = "from";
+            fromSpan.textContent = from + ": ";
+            div.appendChild(fromSpan);
+
+            const textSpan = document.createElement("span");
+            textSpan.textContent = text;
+            div.appendChild(textSpan);
+
+            if (ts) {
+                const d = new Date(ts);
+                if (!isNaN(d.getTime())) {
+                    const timeSpan = document.createElement("span");
+                    timeSpan.className = "time";
+                    timeSpan.textContent = " (" + d.toLocaleTimeString() + ")";
+                    div.appendChild(timeSpan);
+                }
+            }
+
+            chat.messagesDiv.appendChild(div);
+            chat.messagesDiv.scrollTop = chat.messagesDiv.scrollHeight;
+        }
+
+        // ===== История из Redis =====
+
+        async function loadHistory(login) {
+            try {
+                const res = await fetch("/chat/history?login=" + encodeURIComponent(login));
+                if (!res.ok) {
+                    console.error("history error for", login, res.status);
+                    return;
+                }
+                const data = await res.json();
+                const messages = data.messages || [];
+                messages.forEach(m => {
+                    // m.timestamp — RFC3339-строка от Go, например "2025-11-14T18:00:00Z"
+                    const ts = m.timestamp ? Date.parse(m.timestamp) : null;
+                    appendMessage(m.login || login, m.from, m.text, ts);
+                });
+            } catch (err) {
+                console.error("loadHistory error:", err);
+            }
+        }
+
+        // ===== Список активных логинов =====
+
+        async function pollActiveChats() {
+            try {
+                const res = await fetch("/chat/active");
+                if (!res.ok) {
+                    console.error("chat/active error:", res.status);
+                    return;
+                }
+                const data = await res.json();
+                const logins = data.logins || [];
+                logins.forEach(login => {
+                    if (!openChats.has(login)) {
+                        createChatBox(login);
+                    }
+                });
+            } catch (err) {
+                console.error("pollActiveChats error:", err);
+            }
+        }
+
+        setInterval(pollActiveChats, 2000);
+        pollActiveChats();
+
+        // ===== WebSocket админки =====
+
+        const wsProto = location.protocol === "https:" ? "wss" : "ws";
+        const wsUrl   = wsProto + "://" + location.host + "/ws/admin";
+        const ws      = new WebSocket(wsUrl);
+
+        ws.onmessage = (event) => {
+            try {
+                const data = JSON.parse(event.data);
+                console.log("WS message:", data); // <-- чтобы видеть, что реально прилетает
+
+                const login = data.login;
+                const from  = data.from;
+                const text  = data.text;
+                const ts    = data.timestamp ? Date.parse(data.timestamp) : null;
+
+                if (!login || !from || text === undefined) {
+                    return;
+                }
+
+                appendMessage(login, from, text, ts);
+            } catch (err) {
+                console.error("ws message parse error:", err);
+            }
+        };
+
+        ws.onerror = (e) => {
+            console.error("WebSocket error:", e);
+        };
+
+        ws.onclose = () => {
+            console.warn("WebSocket closed");
+        };
     </script>
 </body>
 </html>
