@@ -2,146 +2,135 @@
 <html lang="ru">
 <head>
     <meta charset="UTF-8">
-    <title>Клиентский чат</title>
+    <title>Клиент Mubarakov</title>
     <style>
-        body {
-            font-family: sans-serif;
-            margin: 20px;
-        }
-        h1, h2 {
-            margin-bottom: 8px;
-        }
-        form {
-            margin-bottom: 16px;
-        }
-        input, button {
+        body { font-family: sans-serif; margin: 20px; }
+        h1, h2, h3 { margin-bottom: 8px; }
+        input, textarea, button {
             margin-top: 4px;
             margin-bottom: 4px;
         }
-        .hidden {
-            display: none;
+        textarea {
+            width: 100%;
+            box-sizing: border-box;
+            font-family: monospace;
+            font-size: 12px;
         }
-        #chatBox {
-            border: 1px solid #ccc;
-            border-radius: 6px;
-            padding: 10px;
-            max-width: 600px;
-            margin-top: 20px;
-        }
-        #messages {
-            border: 1px solid #eee;
-            border-radius: 4px;
-            height: 250px;
-            overflow-y: auto;
-            padding: 6px;
+        .section { margin-bottom: 24px; }
+        .hidden { display: none; }
+        .status { font-size: 13px; margin-top: 4px; }
+        .mono {
+            font-family: monospace;
+            font-size: 12px;
+            white-space: pre-wrap;
+            word-break: break-all;
             background: #fafafa;
+            border: 1px solid #eee;
+            padding: 4px;
+        }
+        .chat-box {
+            border: 1px solid #ccc;
+            padding: 10px;
+            border-radius: 6px;
+            box-shadow: 0 0 4px rgba(0,0,0,0.05);
+            max-width: 500px;
+        }
+        .chat-messages {
+            border: 1px solid #eee;
+            height: 200px;
+            overflow-y: auto;
             margin-bottom: 8px;
+            padding: 4px;
+            background: #fafafa;
             font-size: 14px;
         }
-        .msg-line {
-            margin: 2px 0;
-        }
-        .msg-line span.from {
-            font-weight: bold;
-        }
-        .msg-line span.time {
-            font-size: 10px;
-            color: #666;
-            margin-left: 4px;
-        }
+        .msg-line { margin: 2px 0; }
+        .msg-line span.from { font-weight: bold; }
+        .msg-line span.time { font-size: 10px; color:#666; margin-left:4px; }
     </style>
 </head>
 <body>
-    <h1>Клиентский чат</h1>
+    <h1>Клиент Mubarakov</h1>
 
-    <!-- Шаг 1: ввод логина -->
-    <div id="step1">
+    <!-- Шаг 1: логин -->
+    <div class="section" id="step1">
         <h2>Шаг 1. Введите логин</h2>
-        <form id="loginForm">
+        <form id="startAuthForm">
             <input type="text" name="login" placeholder="Логин"><br>
             <button type="submit">Начать аутентификацию</button>
         </form>
-        <div id="step1Status"></div>
+        <div id="step1Status" class="status"></div>
     </div>
 
-    <!-- Шаг 2: пароль + код из Telegram + приватный RSA-ключ -->
-    <div id="step2" class="hidden">
+    <!-- Шаг 2: пароль + код из Telegram + приватный ключ -->
+    <div class="section hidden" id="step2">
         <h2>Шаг 2. Пароль, код из Telegram и приватный RSA-ключ</h2>
         <p>Код-слово (хэш), полученный от сервера:</p>
-        <pre id="codeWordBox"></pre>
+        <pre id="codeWordBox" class="mono"></pre>
 
-        <form id="finishForm">
+        <form id="finishAuthForm">
             <input type="password" name="password" placeholder="Пароль"><br>
             <input type="text" name="tg_code" placeholder="Код из Telegram"><br>
 
-            <p>Вставьте сюда свой <b>приватный RSA-ключ</b> (который выдали при регистрации):</p>
-            <textarea name="private_key" rows="8" style="width: 100%; box-sizing: border-box;"
+            <p>Вставьте свой приватный RSA-ключ:</p>
+            <textarea name="private_key" rows="8"
                       placeholder="-----BEGIN RSA PRIVATE KEY-----&#10;...&#10;-----END RSA PRIVATE KEY-----"></textarea><br>
 
             <button type="submit">Завершить аутентификацию</button>
         </form>
-        <div id="step2Status"></div>
+        <div id="step2Status" class="status"></div>
     </div>
 
+    <!-- После успешной аутентификации -->
+    <div id="afterAuth" class="hidden">
 
-    <!-- Шаг 3: чат -->
-    <div id="step3" class="hidden">
-        <h2>Чат</h2>
-        <div id="chatBox">
-            <div id="messages"></div>
-            <input type="text" id="chatInput" placeholder="Сообщение..." style="width: 100%; box-sizing: border-box;">
-            <button id="sendBtn" style="margin-top: 6px;">Отправить</button>
-            <div id="status"></div>
+        <!-- Чат -->
+        <div class="section">
+            <h2>Чат</h2>
+            <div class="chat-box">
+                <div id="chatMessages" class="chat-messages"></div>
+                <input type="text" id="chatInput" placeholder="Сообщение..." style="width:100%;">
+                <button id="chatSendBtn">Отправить</button>
+                <div id="chatStatus" class="status"></div>
+            </div>
+        </div>
+
+        <!-- Голосование -->
+        <div class="section" id="voteSection">
+            <h2>Электронное голосование</h2>
+
+            <div>
+                <label>Номер голосования (ID):
+                    <input type="number" id="voteElectionId" min="1" step="1">
+                </label>
+                <button id="voteLoadInfoBtn">Загрузить информацию</button>
+            </div>
+            <div id="voteInfoBox" class="mono" style="margin-top:8px;">
+                Информация о голосовании ещё не загружена.
+            </div>
+
+            <h3>Ваш выбор</h3>
+            <label><input type="radio" name="voteChoice" value="yes"> За</label><br>
+            <label><input type="radio" name="voteChoice" value="no"> Против</label><br>
+            <label><input type="radio" name="voteChoice" value="abstain"> Воздержаться</label><br>
+
+            <button id="voteSubmitBtn" style="margin-top:8px;">Проголосовать</button>
+            <div id="voteStatus" class="status"></div>
         </div>
     </div>
 
     <script>
         let currentLogin = "";
         let codeWord = "";
-        let ws = null;
+        let isAuthed = false;
 
-        const step1 = document.getElementById("step1");
-        const step2 = document.getElementById("step2");
-        const step3 = document.getElementById("step3");
-        const step1Status = document.getElementById("step1Status");
-        const step2Status = document.getElementById("step2Status");
+        // ===== Шаг 1: /start-auth =====
+        const startAuthForm = document.getElementById("startAuthForm");
+        const step1Status   = document.getElementById("step1Status");
+        const step2Div      = document.getElementById("step2");
+        const codeWordBox   = document.getElementById("codeWordBox");
 
-        const messagesDiv = document.getElementById("messages");
-        const chatInput = document.getElementById("chatInput");
-        const sendBtn = document.getElementById("sendBtn");
-        const statusDiv = document.getElementById("status");
-
-        function appendMessage(from, text, ts, isHistory) {
-            const div = document.createElement("div");
-            div.className = "msg-line";
-
-            let prefix = "";
-            if (isHistory) prefix = "[history] ";
-
-            const fromSpan = document.createElement("span");
-            fromSpan.className = "from";
-            fromSpan.textContent = prefix + from + ": ";
-            div.appendChild(fromSpan);
-
-            const textSpan = document.createElement("span");
-            textSpan.textContent = text;
-            div.appendChild(textSpan);
-
-            if (ts) {
-                const timeSpan = document.createElement("span");
-                timeSpan.className = "time";
-                const d = new Date(ts);
-                timeSpan.textContent = " (" + d.toLocaleTimeString() + ")";
-                div.appendChild(timeSpan);
-            }
-
-            messagesDiv.appendChild(div);
-            messagesDiv.scrollTop = messagesDiv.scrollHeight;
-        }
-
-        // ===================== Шаг 1: старт аутентификации =====================
-
-        document.getElementById("loginForm").addEventListener("submit", async (e) => {
+        startAuthForm.addEventListener("submit", async (e) => {
             e.preventDefault();
             const login = e.target.login.value.trim();
             if (!login) {
@@ -150,152 +139,277 @@
                 return;
             }
 
-            step1Status.textContent = "Отправка запроса...";
+            step1Status.textContent = "Отправляем запрос...";
             step1Status.style.color = "black";
 
             try {
                 const res = await fetch("/start-auth", {
                     method: "POST",
-                    headers: { "Content-Type": "application/json" },
+                    headers: {"Content-Type": "application/json"},
                     body: JSON.stringify({ login })
                 });
+                const data = await res.json();
 
                 if (!res.ok) {
-                    const errText = await res.text();
-                    step1Status.textContent = "Ошибка: " + errText;
+                    step1Status.textContent = "Ошибка: " + (data.error || JSON.stringify(data));
                     step1Status.style.color = "red";
                     return;
                 }
 
-                const data = await res.json();
-                codeWord = data.code_word;
                 currentLogin = login;
-
-                step1Status.textContent = "Код-слово получено, проверьте Telegram.";
+                codeWord = data.code_word || data.CodeWord || ""; // в зависимости от того, как названо поле
+                codeWordBox.textContent = codeWord || "(сервер не вернул код-слово)";
+                step1Status.textContent = "Код-слово получено. Теперь введите пароль, код из Telegram и приватный ключ.";
                 step1Status.style.color = "green";
 
-                document.getElementById("codeWordBox").textContent = codeWord;
-
-                step1.classList.add("hidden");
-                step2.classList.remove("hidden");
+                step2Div.classList.remove("hidden");
             } catch (err) {
-                step1Status.textContent = "Ошибка сети: " + err;
+                step1Status.textContent = "Ошибка запроса: " + err;
                 step1Status.style.color = "red";
             }
         });
 
-        // ===================== Шаг 2: завершение аутентификации =====================
+        // ===== Шаг 2: /finish-auth-web =====
+        const finishAuthForm = document.getElementById("finishAuthForm");
+        const step2Status    = document.getElementById("step2Status");
+        const afterAuthDiv   = document.getElementById("afterAuth");
 
-document.getElementById("finishForm").addEventListener("submit", async (e) => {
-    e.preventDefault();
+        finishAuthForm.addEventListener("submit", async (e) => {
+            e.preventDefault();
 
-    const password   = e.target.password.value.trim();
-    const tgCode     = e.target.tg_code.value.trim();
-    const privateKey = e.target.private_key.value.trim();
+            const password   = e.target.password.value.trim();
+            const tgCode     = e.target.tg_code.value.trim();
+            const privateKey = e.target.private_key.value.trim();
 
-    if (!password || !tgCode || !privateKey) {
-        step2Status.textContent = "Введите пароль, код из Telegram и вставьте приватный ключ";
-        step2Status.style.color = "red";
+            if (!password || !tgCode || !privateKey || !currentLogin || !codeWord) {
+                step2Status.textContent = "Заполните все поля и убедитесь, что шаг 1 выполнен.";
+                step2Status.style.color = "red";
+                return;
+            }
+
+            step2Status.textContent = "Завершаем аутентификацию...";
+            step2Status.style.color = "black";
+
+            try {
+                const res = await fetch("/finish-auth-web", {
+                    method: "POST",
+                    headers: {"Content-Type": "application/json"},
+                    body: JSON.stringify({
+                        login:       currentLogin,
+                        password:    password,
+                        tg_code:     tgCode,
+                        code_word:   codeWord,
+                        private_key: privateKey
+                    })
+                });
+                const data = await res.json();
+
+                if (!res.ok) {
+                    step2Status.textContent = "Ошибка аутентификации: " + (data.error || JSON.stringify(data));
+                    step2Status.style.color = "red";
+                    return;
+                }
+
+                step2Status.textContent = "Аутентификация выполнена: " + (data.message || "OK");
+                step2Status.style.color = "green";
+
+                isAuthed = true;
+                afterAuthDiv.classList.remove("hidden");
+
+                // тут можно подключиться к WebSocket-чату
+                initChatWS();
+            } catch (err) {
+                step2Status.textContent = "Ошибка запроса: " + err;
+                step2Status.style.color = "red";
+            }
+        });
+
+        // ===== Чат (минимальный скелет, ты можешь заменить на свой уже рабочий) =====
+
+        const chatMessages = document.getElementById("chatMessages");
+        const chatInput    = document.getElementById("chatInput");
+        const chatSendBtn  = document.getElementById("chatSendBtn");
+        const chatStatus   = document.getElementById("chatStatus");
+
+        let chatWS = null;
+
+        function appendChatMessage(from, text, ts) {
+            const div = document.createElement("div");
+            div.className = "msg-line";
+
+            const fromSpan = document.createElement("span");
+            fromSpan.className = "from";
+            fromSpan.textContent = from + ": ";
+            div.appendChild(fromSpan);
+
+            const textSpan = document.createElement("span");
+            textSpan.textContent = text;
+            div.appendChild(textSpan);
+
+            if (ts) {
+                const d = new Date(ts);
+                if (!isNaN(d.getTime())) {
+                    const timeSpan = document.createElement("span");
+                    timeSpan.className = "time";
+                    timeSpan.textContent = " (" + d.toLocaleTimeString() + ")";
+                    div.appendChild(timeSpan);
+                }
+            }
+
+            chatMessages.appendChild(div);
+            chatMessages.scrollTop = chatMessages.scrollHeight;
+        }
+
+        function initChatWS() {
+    if (!currentLogin) {
+        chatStatus.textContent = "Нет логина, сначала авторизуйтесь";
+        chatStatus.style.color = "red";
         return;
     }
 
-    step2Status.textContent = "Завершаем аутентификацию...";
-    step2Status.style.color = "black";
+    const proto = location.protocol === "https:" ? "wss" : "ws";
+    const url   = proto + "://" + location.host + "/ws/chat?login=" + encodeURIComponent(currentLogin);
 
-    try {
-        const res = await fetch("/finish-auth-web", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-                login:      currentLogin,
-                password:   password,
-                tg_code:    tgCode,
-                code_word:  codeWord,
-                private_key: privateKey
-            })
-        });
-    // дальше как было
+    chatWS = new WebSocket(url);
 
+    chatWS.onopen = () => {
+        chatStatus.textContent = "WebSocket подключен.";
+        chatStatus.style.color = "green";
+    };
 
-        if (!res.ok) {
-            const errText = await res.text();
-            step2Status.textContent = "Ошибка: " + errText;
-            step2Status.style.color = "red";
-            return;
+    chatWS.onmessage = (event) => {
+        try {
+            const msg = JSON.parse(event.data);
+            const from = msg.from || "server";
+            const text = msg.text || "";
+            const ts   = msg.timestamp || null;
+            appendChatMessage(from, text, ts);
+        } catch (err) {
+            console.error("chat ws parse error:", err);
         }
+    };
 
-        const data = await res.json();
-        step2Status.textContent = (data.message || "Аутентификация завершена") +
-            (data.sign_message ? " | " + data.sign_message : "");
-        step2Status.style.color = "green";
+    chatWS.onerror = (e) => {
+        console.error("chat ws error:", e);
+        chatStatus.textContent = "Ошибка WebSocket";
+        chatStatus.style.color = "red";
+    };
 
-        step2.classList.add("hidden");
-        step3.classList.remove("hidden");
-
-        initChatWebSocket();
-    } catch (err) {
-        step2Status.textContent = "Ошибка сети: " + err;
-        step2Status.style.color = "red";
-    }
-});
-
-
-        // ===================== Шаг 3: чат через WebSocket =====================
-
-        function initChatWebSocket() {
-            const proto = location.protocol === "https:" ? "wss" : "ws";
-            const wsUrl = proto + "://" + location.host + "/ws/chat?login=" + encodeURIComponent(currentLogin);
-
-            ws = new WebSocket(wsUrl);
-
-            ws.onopen = () => {
-                statusDiv.textContent = "Чат подключен";
-                statusDiv.style.color = "green";
-            };
-
-            ws.onmessage = (event) => {
-                try {
-                    const data = JSON.parse(event.data);
-                    // от Go ждём: { from, text, timestamp, is_history }
-                    appendMessage(data.from, data.text, data.timestamp, data.is_history);
-                } catch (err) {
-                    console.error("ws message parse error:", err);
-                }
-            };
-
-            ws.onerror = (e) => {
-                console.error("WebSocket error:", e);
-                statusDiv.textContent = "Ошибка WebSocket";
-                statusDiv.style.color = "red";
-            };
-
-            ws.onclose = () => {
-                statusDiv.textContent = "Чат отключен";
-                statusDiv.style.color = "orange";
-            };
-
-            sendBtn.addEventListener("click", sendChatMessage);
-            chatInput.addEventListener("keydown", (e) => {
-                if (e.key === "Enter") {
-                    e.preventDefault();
-                    sendChatMessage();
-                }
-            });
-        }
-
-        function sendChatMessage() {
-    const text = chatInput.value.trim();
-    if (!text || !ws || ws.readyState !== WebSocket.OPEN) return;
-
-    // отправляем на Go
-    ws.send(JSON.stringify({ text }));
-
-    // сразу отрисовываем у себя
-    appendMessage("you", text, Date.now(), false);
-
-    chatInput.value = "";
+    chatWS.onclose = () => {
+        console.warn("chat ws closed");
+        chatStatus.textContent = "Подключение закрыто";
+        chatStatus.style.color = "red";
+    };
 }
 
+
+        chatSendBtn.addEventListener("click", () => {
+            const text = chatInput.value.trim();
+            if (!text || !chatWS || chatWS.readyState !== WebSocket.OPEN) return;
+
+            // формат сообщения зависит от твоей серверной реализации;
+            // можно просто отправлять plaintext, а сервер сам разберётся и зашифрует
+            chatWS.send(JSON.stringify({ text }));
+            chatInput.value = "";
+        });
+
+        // ===== Голосование =====
+
+        const voteElectionIdInput = document.getElementById("voteElectionId");
+        const voteLoadInfoBtn     = document.getElementById("voteLoadInfoBtn");
+        const voteInfoBox         = document.getElementById("voteInfoBox");
+        const voteSubmitBtn       = document.getElementById("voteSubmitBtn");
+        const voteStatus          = document.getElementById("voteStatus");
+
+        voteLoadInfoBtn.addEventListener("click", async () => {
+            const id = parseInt(voteElectionIdInput.value, 10);
+            if (!id) {
+                voteStatus.textContent = "Укажите корректный ID голосования";
+                voteStatus.style.color = "red";
+                return;
+            }
+
+            voteStatus.textContent = "Загружаем информацию...";
+            voteStatus.style.color = "black";
+
+            try {
+                const res = await fetch(`/vote/info?election_id=${encodeURIComponent(id)}`);
+                const data = await res.json();
+
+                if (!res.ok) {
+                    voteInfoBox.textContent = "Ошибка: " + (data.error || JSON.stringify(data));
+                    voteStatus.textContent = "Ошибка загрузки информации";
+                    voteStatus.style.color = "red";
+                    return;
+                }
+
+                voteInfoBox.textContent =
+                    `ID: ${data.id}\n` +
+                    `Название: ${data.title}\n` +
+                    `Описание: ${data.description || "(нет)"}\n` +
+                    `Статус: ${data.status}\n` +
+                    `RSA.m (модуль): ${data.m}\n` +
+                    `RSA.e (экспонента): ${data.e}\n`;
+
+                voteStatus.textContent = "Информация загружена";
+                voteStatus.style.color = "green";
+            } catch (err) {
+                voteInfoBox.textContent = "Ошибка загрузки информации: " + err;
+                voteStatus.textContent = "Ошибка загрузки информации";
+                voteStatus.style.color = "red";
+            }
+        });
+
+        voteSubmitBtn.addEventListener("click", async () => {
+            if (!isAuthed) {
+                voteStatus.textContent = "Сначала пройдите аутентификацию";
+                voteStatus.style.color = "red";
+                return;
+            }
+
+            const id = parseInt(voteElectionIdInput.value, 10);
+            if (!id) {
+                voteStatus.textContent = "Укажите корректный ID голосования";
+                voteStatus.style.color = "red";
+                return;
+            }
+
+            const choiceInput = document.querySelector('input[name="voteChoice"]:checked');
+            if (!choiceInput) {
+                voteStatus.textContent = "Выберите вариант голосования";
+                voteStatus.style.color = "red";
+                return;
+            }
+
+            const choice = choiceInput.value; // "yes" | "no" | "abstain"
+
+            voteStatus.textContent = "Отправляем голос...";
+            voteStatus.style.color = "black";
+
+            try {
+                const res = await fetch("/vote/submit", {
+                    method: "POST",
+                    headers: {"Content-Type": "application/json"},
+                    body: JSON.stringify({
+                        election_id: id,
+                        choice: choice
+                    })
+                });
+                const data = await res.json();
+
+                if (!res.ok) {
+                    voteStatus.textContent = "Ошибка голосования: " + (data.error || JSON.stringify(data));
+                    voteStatus.style.color = "red";
+                    return;
+                }
+
+                voteStatus.textContent = "Голос учтён";
+                voteStatus.style.color = "green";
+            } catch (err) {
+                voteStatus.textContent = "Ошибка запроса: " + err;
+                voteStatus.style.color = "red";
+            }
+        });
     </script>
 </body>
 </html>

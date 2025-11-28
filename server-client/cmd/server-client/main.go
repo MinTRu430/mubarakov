@@ -11,6 +11,7 @@ import (
 	"server-client/internal/chatpb"
 	"server-client/internal/reg"
 	"server-client/internal/utils"
+	"server-client/internal/vote"
 
 	"github.com/redis/go-redis/v9"
 	"google.golang.org/grpc"
@@ -60,6 +61,11 @@ func main() {
 	chatService := chat.NewService(chatRepo, rdb)
 	chatHandler := chat.NewHandler(chatService)
 
+	// Vote
+	voteRepo := vote.NewRepository(db)
+	voteService := vote.NewService(voteRepo)
+	voteHandler := vote.NewHandler(voteService)
+
 	go func() {
 		lis, err := net.Listen("tcp", ":50051")
 		if err != nil {
@@ -90,6 +96,18 @@ func main() {
 	http.HandleFunc("/chat/active", chatHandler.ActiveChats)
 	http.HandleFunc("/chat/history", chatHandler.History)
 	http.HandleFunc("/ws/admin", chatHandler.AdminWS)
+
+	// Vote admin
+	http.HandleFunc("/vote/admin/create", voteHandler.CreateElection)
+	http.HandleFunc("/vote/admin/open", voteHandler.OpenElection)
+	http.HandleFunc("/vote/admin/close", voteHandler.CloseElection)
+	http.HandleFunc("/vote/admin/count", voteHandler.CountElection)
+	http.HandleFunc("/vote/admin/list", voteHandler.ListElections)
+	http.HandleFunc("/vote/admin/result", voteHandler.GetResult)
+
+	// Vote public/client
+	http.HandleFunc("/vote/info", voteHandler.Info)
+	http.HandleFunc("/vote/submit", voteHandler.Submit)
 
 	log.Println("Server started on :8080")
 	log.Fatal(http.ListenAndServe(":8080", nil))

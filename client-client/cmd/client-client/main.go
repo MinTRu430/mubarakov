@@ -10,6 +10,7 @@ import (
 	"client-client/internal/authclient"
 	"client-client/internal/chatpb"
 	"client-client/internal/utils"
+	"client-client/internal/voteclient"
 
 	"github.com/gorilla/websocket"
 	"google.golang.org/grpc"
@@ -25,15 +26,23 @@ func main() {
 		port = "8090"
 	}
 
-	service := authclient.NewService("http://localhost:8080")
-	handler := authclient.NewHandler(service)
+	serverURL := "http://localhost:8080"
 
-	http.HandleFunc("/start-auth", handler.StartAuth)
-	http.HandleFunc("/finish-auth-web", handler.FinishAuthWeb)
+	authSvc := authclient.NewService(serverURL)
+	authHandler := authclient.NewHandler(authSvc)
+
+	voteSvc := voteclient.NewService(serverURL, authSvc)
+	voteHandler := voteclient.NewHandler(voteSvc)
+
+	http.HandleFunc("/start-auth", authHandler.StartAuth)
+	http.HandleFunc("/finish-auth-web", authHandler.FinishAuthWeb)
 
 	http.HandleFunc("/ws/chat", func(w http.ResponseWriter, r *http.Request) {
-		chatWSHandler(w, r, service)
+		chatWSHandler(w, r, authSvc)
 	})
+
+	http.HandleFunc("/vote/info", voteHandler.Info)
+	http.HandleFunc("/vote/submit", voteHandler.Submit)
 
 	fs := http.FileServer(http.Dir("./static"))
 	http.Handle("/", fs)

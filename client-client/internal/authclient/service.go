@@ -17,6 +17,12 @@ type Service struct {
 	serverURL   string
 	sessionKeys sync.Map
 	sessionB    sync.Map
+
+	currentLogin string
+}
+
+func (s *Service) GetCurrentLogin() string {
+	return s.currentLogin
 }
 
 func NewService(serverURL string) *Service {
@@ -156,6 +162,8 @@ func (s *Service) FinishAuthWithRSA(login, password, codeWordHash, tgCode, priva
 	}
 
 	s.SaveSessionKey(login, K.String())
+
+	s.currentLogin = login
 
 	return message, K.String(), nil
 }

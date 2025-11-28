@@ -2,7 +2,7 @@
 <html lang="ru">
 <head>
     <meta charset="UTF-8">
-    <title>Админка: регистрация, ключи и чаты</title>
+    <title>Админка: регистрация, ключи, голосование и чаты</title>
     <style>
         body {
             font-family: sans-serif;
@@ -14,7 +14,7 @@
         form {
             margin-bottom: 16px;
         }
-        input, textarea, button {
+        input, textarea, button, select {
             margin-top: 4px;
             margin-bottom: 4px;
         }
@@ -41,7 +41,7 @@
         }
         .top-section {
             flex: 1;
-            min-width: 0; /* чтобы textarea ужимались */
+            min-width: 0;
         }
 
         .chat-container {
@@ -81,6 +81,26 @@
             color: #666;
             margin-left: 4px;
         }
+
+        .flex-row {
+            display: flex;
+            gap: 16px;
+            align-items: flex-start;
+        }
+        .flex-item {
+            flex: 1;
+            min-width: 0;
+        }
+
+        .mono {
+            font-family: monospace;
+            font-size: 12px;
+            white-space: pre-wrap;
+            word-break: break-all;
+            background: #fafafa;
+            border: 1px solid #eee;
+            padding: 4px;
+        }
     </style>
 </head>
 <body>
@@ -118,6 +138,60 @@
             <textarea id="rsaPrivateKey" rows="8" readonly
                       placeholder="Здесь появится новый приватный ключ после перегенерации"></textarea>
             <small><br>⚠️ Старый приватный ключ станет недействительным, подписи нужно будет делать этим новым.</small>
+        </div>
+    </div>
+
+    <hr>
+
+    <!-- ========== Электронное голосование ========== -->
+    <div class="section">
+        <h2>Электронное голосование</h2>
+
+        <!-- верхняя часть: создание + выбор голосования -->
+        <div class="flex-row">
+            <div class="flex-item">
+                <h3>Создать новое голосование</h3>
+                <form id="electionCreateForm">
+                    <input type="text" name="title" placeholder="Название голосования" style="width:100%;"><br>
+                    <textarea name="description" rows="3" placeholder="Описание (опционально)"></textarea><br>
+                    <button type="submit">Создать</button>
+                </form>
+                <div id="electionCreateStatus" class="status"></div>
+            </div>
+
+            <div class="flex-item">
+                <h3>Выбор голосования</h3>
+                <div>
+                    <select id="electionSelect" style="width:100%;">
+                        <option value="">— нет выбранного голосования —</option>
+                    </select>
+                    <button id="electionRefreshBtn">Обновить список</button>
+                </div>
+                <div id="electionStatus" class="status"></div>
+
+                <div style="margin-top:8px;">
+                    <button id="electionOpenBtn">Открыть для голосования</button>
+                    <button id="electionCloseBtn">Закрыть для голосования</button>
+                    <button id="electionCountBtn">Подсчитать голоса</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- нижняя часть: информация и результат -->
+        <div class="flex-row" style="margin-top:16px;">
+            <div class="flex-item">
+                <h3>Информация о голосовании</h3>
+                <div id="electionInfoBox" class="mono">
+                    Голосование не выбрано.
+                </div>
+            </div>
+
+            <div class="flex-item">
+                <h3>Результаты (после подсчёта)</h3>
+                <div id="electionResultBox" class="mono">
+                    Результат ещё не посчитан или голосование не выбрано.
+                </div>
+            </div>
         </div>
     </div>
 
@@ -233,6 +307,264 @@
             }
         });
 
+        // ===================== Голосование (admin UI) =====================
+
+        const electionCreateForm   = document.getElementById("electionCreateForm");
+        const electionCreateStatus = document.getElementById("electionCreateStatus");
+        const electionSelect       = document.getElementById("electionSelect");
+        const electionRefreshBtn   = document.getElementById("electionRefreshBtn");
+        const electionStatus       = document.getElementById("electionStatus");
+        const electionOpenBtn      = document.getElementById("electionOpenBtn");
+        const electionCloseBtn     = document.getElementById("electionCloseBtn");
+        const electionCountBtn     = document.getElementById("electionCountBtn");
+        const electionInfoBox      = document.getElementById("electionInfoBox");
+        const electionResultBox    = document.getElementById("electionResultBox");
+
+        let electionsCache = []; // список из /vote/admin/list
+
+        electionCreateForm.addEventListener("submit", async (e) => {
+            e.preventDefault();
+            const title = e.target.title.value.trim();
+            const description = e.target.description.value.trim();
+
+            if (!title) {
+                electionCreateStatus.textContent = "Введите название голосования";
+                electionCreateStatus.style.color = "red";
+                return;
+            }
+
+            electionCreateStatus.textContent = "Создаём голосование...";
+            electionCreateStatus.style.color = "black";
+
+            try {
+                const res = await fetch("/vote/admin/create", {
+                    method: "POST",
+                    headers: {"Content-Type": "application/json"},
+                    body: JSON.stringify({ title, description })
+                });
+                const data = await res.json();
+
+                if (!res.ok) {
+                    electionCreateStatus.textContent = "Ошибка создания: " + (data.error || JSON.stringify(data));
+                    electionCreateStatus.style.color = "red";
+                    return;
+                }
+
+                electionCreateStatus.textContent = "Создано голосование с id = " + data.id;
+                electionCreateStatus.style.color = "green";
+
+                e.target.title.value = "";
+                e.target.description.value = "";
+
+                await loadElections();
+            } catch (err) {
+                electionCreateStatus.textContent = "Ошибка запроса: " + err;
+                electionCreateStatus.style.color = "red";
+            }
+        });
+
+        electionRefreshBtn.addEventListener("click", () => {
+            loadElections();
+        });
+
+        electionSelect.addEventListener("change", () => {
+            const id = parseInt(electionSelect.value, 10);
+            if (!id) {
+                electionInfoBox.textContent = "Голосование не выбрано.";
+                electionResultBox.textContent = "Результат ещё не посчитан или голосование не выбрано.";
+                return;
+            }
+            const info = electionsCache.find(e => e.id === id);
+            renderElectionInfo(info);
+            loadElectionResult(id);
+        });
+
+        electionOpenBtn.addEventListener("click", async () => {
+            const id = getSelectedElectionId();
+            if (!id) return;
+
+            electionStatus.textContent = "Открываем голосование...";
+            electionStatus.style.color = "black";
+
+            try {
+                const res = await fetch("/vote/admin/open", {
+                    method: "POST",
+                    headers: {"Content-Type": "application/json"},
+                    body: JSON.stringify({ election_id: id })
+                });
+                const data = await res.json();
+                if (!res.ok) {
+                    electionStatus.textContent = "Ошибка открытия: " + (data.error || JSON.stringify(data));
+                    electionStatus.style.color = "red";
+                    return;
+                }
+                electionStatus.textContent = "Голосование открыто";
+                electionStatus.style.color = "green";
+                await loadElections(id);
+            } catch (err) {
+                electionStatus.textContent = "Ошибка запроса: " + err;
+                electionStatus.style.color = "red";
+            }
+        });
+
+        electionCloseBtn.addEventListener("click", async () => {
+            const id = getSelectedElectionId();
+            if (!id) return;
+
+            electionStatus.textContent = "Закрываем голосование...";
+            electionStatus.style.color = "black";
+
+            try {
+                const res = await fetch("/vote/admin/close", {
+                    method: "POST",
+                    headers: {"Content-Type": "application/json"},
+                    body: JSON.stringify({ election_id: id })
+                });
+                const data = await res.json();
+                if (!res.ok) {
+                    electionStatus.textContent = "Ошибка закрытия: " + (data.error || JSON.stringify(data));
+                    electionStatus.style.color = "red";
+                    return;
+                }
+                electionStatus.textContent = "Голосование закрыто";
+                electionStatus.style.color = "green";
+                await loadElections(id);
+            } catch (err) {
+                electionStatus.textContent = "Ошибка запроса: " + err;
+                electionStatus.style.color = "red";
+            }
+        });
+
+        electionCountBtn.addEventListener("click", async () => {
+            const id = getSelectedElectionId();
+            if (!id) return;
+
+            electionStatus.textContent = "Подсчитываем голоса...";
+            electionStatus.style.color = "black";
+
+            try {
+                const res = await fetch("/vote/admin/count", {
+                    method: "POST",
+                    headers: {"Content-Type": "application/json"},
+                    body: JSON.stringify({ election_id: id })
+                });
+                const data = await res.json();
+                if (!res.ok) {
+                    electionStatus.textContent = "Ошибка подсчёта: " + (data.error || JSON.stringify(data));
+                    electionStatus.style.color = "red";
+                    return;
+                }
+                electionStatus.textContent = "Подсчёт выполнен";
+                electionStatus.style.color = "green";
+
+                await loadElections(id);
+                await loadElectionResult(id);
+            } catch (err) {
+                electionStatus.textContent = "Ошибка запроса: " + err;
+                electionStatus.style.color = "red";
+            }
+        });
+
+        function getSelectedElectionId() {
+            const idStr = electionSelect.value;
+            if (!idStr) {
+                electionStatus.textContent = "Выберите голосование";
+                electionStatus.style.color = "red";
+                return null;
+            }
+            const id = parseInt(idStr, 10);
+            if (!id) {
+                electionStatus.textContent = "Некорректный id голосования";
+                electionStatus.style.color = "red";
+                return null;
+            }
+            return id;
+        }
+
+        async function loadElections(keepSelectedId) {
+            try {
+                const res = await fetch("/vote/admin/list");
+                if (!res.ok) {
+                    console.error("vote/admin/list error:", res.status);
+                    return;
+                }
+                const data = await res.json();
+                electionsCache = data || [];
+
+                const current = keepSelectedId || parseInt(electionSelect.value, 10) || 0;
+
+                electionSelect.innerHTML = "";
+                const optEmpty = document.createElement("option");
+                optEmpty.value = "";
+                optEmpty.textContent = "— выберите голосование —";
+                electionSelect.appendChild(optEmpty);
+
+                electionsCache.forEach(e => {
+                    const opt = document.createElement("option");
+                    opt.value = e.id;
+                    opt.textContent = `#${e.id} [${e.status}] ${e.title}`;
+                    electionSelect.appendChild(opt);
+                });
+
+                if (current) {
+                    electionSelect.value = String(current);
+                }
+
+                if (!electionSelect.value) {
+                    electionInfoBox.textContent = "Голосование не выбрано.";
+                    electionResultBox.textContent = "Результат ещё не посчитан или голосование не выбрано.";
+                } else {
+                    const id = parseInt(electionSelect.value, 10);
+                    const info = electionsCache.find(e => e.id === id);
+                    renderElectionInfo(info);
+                    loadElectionResult(id);
+                }
+            } catch (err) {
+                console.error("loadElections error:", err);
+            }
+        }
+
+        function renderElectionInfo(e) {
+            if (!e) {
+                electionInfoBox.textContent = "Голосование не выбрано.";
+                return;
+            }
+            electionInfoBox.textContent =
+                `ID: ${e.id}\n` +
+                `Название: ${e.title}\n` +
+                `Описание: ${e.description || "(нет)"}\n` +
+                `Статус: ${e.status}\n` +
+                `Создано: ${e.created_at || "(неизвестно)"}\n`;
+        }
+
+        async function loadElectionResult(id) {
+            electionResultBox.textContent = "Загружаем результат...";
+            try {
+                const res = await fetch(`/vote/admin/result?election_id=${encodeURIComponent(id)}`);
+                if (!res.ok) {
+                    electionResultBox.textContent = "Результат ещё не посчитан или ошибка сервера.";
+                    return;
+                }
+                const data = await res.json();
+
+                let txt = "";
+                txt += `Голосование #${data.election_id}: ${data.title}\n\n`;
+                txt += `Голоса "ЗА":       ${data.yes_votes}\n`;
+                txt += `Голоса "ПРОТИВ":  ${data.no_votes}\n`;
+                txt += `Воздержалось:     ${data.abstain_votes}\n`;
+                txt += `Всего проголосовало: ${data.total_voters}\n\n`;
+                txt += `R (произведение q_i):\n${data.R}\n\n`;
+                txt += `F = произведение всех шифротекстов (mod m):\n${data.F}\n\n`;
+                txt += `Q = дешифрованное произведение t_i:\n${data.Q}\n\n`;
+                txt += `Количество шифротекстов: ${(data.ciphertexts || []).length}\n`;
+
+                electionResultBox.textContent = txt;
+            } catch (err) {
+                console.error("loadElectionResult error:", err);
+                electionResultBox.textContent = "Ошибка загрузки результата: " + err;
+            }
+        }
+
         // ===================== Чаты (динамические окна) =====================
 
         const chatContainer = document.getElementById("chatContainer");
@@ -286,7 +618,6 @@
                         return;
                     }
 
-                    // сообщение попадёт в Redis и прилетит по WebSocket
                     input.value = "";
                 } catch (err) {
                     alert("Ошибка отправки: " + err);
@@ -297,9 +628,7 @@
             const chatObj = { root, messagesDiv, input };
             openChats.set(login, chatObj);
 
-            // при первом создании сразу подтягиваем историю
             loadHistory(login);
-
             return chatObj;
         }
 
@@ -335,8 +664,6 @@
             chat.messagesDiv.scrollTop = chat.messagesDiv.scrollHeight;
         }
 
-        // ===== История из Redis =====
-
         async function loadHistory(login) {
             try {
                 const res = await fetch("/chat/history?login=" + encodeURIComponent(login));
@@ -347,7 +674,6 @@
                 const data = await res.json();
                 const messages = data.messages || [];
                 messages.forEach(m => {
-                    // m.timestamp — RFC3339-строка от Go, например "2025-11-14T18:00:00Z"
                     const ts = m.timestamp ? Date.parse(m.timestamp) : null;
                     appendMessage(m.login || login, m.from, m.text, ts);
                 });
@@ -355,8 +681,6 @@
                 console.error("loadHistory error:", err);
             }
         }
-
-        // ===== Список активных логинов =====
 
         async function pollActiveChats() {
             try {
@@ -389,7 +713,7 @@
         ws.onmessage = (event) => {
             try {
                 const data = JSON.parse(event.data);
-                console.log("WS message:", data); // <-- чтобы видеть, что реально прилетает
+                console.log("WS message:", data);
 
                 const login = data.login;
                 const from  = data.from;
@@ -413,6 +737,9 @@
         ws.onclose = () => {
             console.warn("WebSocket closed");
         };
+
+        // стартовая загрузка выборов
+        loadElections();
     </script>
 </body>
 </html>
