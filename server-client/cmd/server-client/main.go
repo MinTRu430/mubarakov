@@ -5,6 +5,7 @@ import (
 	"log"
 	"net"
 	"net/http"
+	"os"
 	"server-client/internal/auth"
 	"server-client/internal/bot"
 	"server-client/internal/chat"
@@ -35,7 +36,15 @@ func main() {
 	}
 	log.Println("redis connected")
 
-	tgToken := "" // убрать в env
+	tgToken := os.Getenv("TG_TOKEN")
+	if tgToken == "" {
+		log.Fatalln("TG_TOKEN is not set")
+	}
+
+	storageK := os.Getenv("CHAT_STORAGE_K")
+	if storageK == "" {
+		log.Fatalln("CHAT_STORAGE_K is not set")
+	}
 
 	botRepo := bot.NewRepository(db)
 	tgBot, err := bot.NewBot(tgToken, botRepo)
@@ -58,7 +67,7 @@ func main() {
 
 	//Auth
 	chatRepo := chat.NewRepository(db)
-	chatService := chat.NewService(chatRepo, rdb)
+	chatService := chat.NewService(chatRepo, rdb, storageK)
 	chatHandler := chat.NewHandler(chatService)
 
 	// Vote

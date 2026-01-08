@@ -303,15 +303,21 @@
 }
 
 
-        chatSendBtn.addEventListener("click", () => {
-            const text = chatInput.value.trim();
-            if (!text || !chatWS || chatWS.readyState !== WebSocket.OPEN) return;
+chatSendBtn.addEventListener("click", () => {
+    const text = chatInput.value.trim();
+    if (!text || !chatWS || chatWS.readyState !== WebSocket.OPEN) return;
 
-            // формат сообщения зависит от твоей серверной реализации;
-            // можно просто отправлять plaintext, а сервер сам разберётся и зашифрует
-            chatWS.send(JSON.stringify({ text }));
-            chatInput.value = "";
-        });
+    // отправляем на сервер
+    chatWS.send(JSON.stringify({ text }));
+
+    // СРАЗУ показываем сообщение у клиента
+    const now = Date.now();
+    const from = currentLogin || "me";
+    appendChatMessage(from, text, now);
+
+    chatInput.value = "";
+});
+
 
         // ===== Голосование =====
 

@@ -24,7 +24,6 @@ func NewService(serverURL string, auth *authclient.Service) *Service {
 	}
 }
 
-// Структура, которую возвращает сервер по /vote/info
 type PublicElectionInfo struct {
 	ID          int    `json:"id"`
 	Title       string `json:"title"`
@@ -43,8 +42,6 @@ type submitVoteServerRequest struct {
 type submitVoteServerResponse struct {
 	Status string `json:"status"`
 }
-
-// ====== Запросы к серверу (8080) ======
 
 func (s *Service) GetElectionInfo(electionID int) (*PublicElectionInfo, error) {
 	url := fmt.Sprintf("%s/vote/info?election_id=%d", s.serverURL, electionID)
@@ -68,7 +65,6 @@ func (s *Service) GetElectionInfo(electionID int) (*PublicElectionInfo, error) {
 	return &info, nil
 }
 
-// choice: "yes" | "no" | "abstain"
 func (s *Service) SubmitVote(electionID int, choice string) error {
 	login := s.authService.GetCurrentLogin()
 	if login == "" {
@@ -99,7 +95,6 @@ func (s *Service) SubmitVote(electionID int, choice string) error {
 	// b_i
 	b := big.NewInt(bVal)
 
-	// q_i: берём случайное большое простое (точно >= 5)
 	q, err := rand.Prime(rand.Reader, 64) // 64 бит более чем достаточно
 	if err != nil {
 		return fmt.Errorf("failed to generate prime: %w", err)

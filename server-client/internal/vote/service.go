@@ -49,8 +49,6 @@ type PublicElectionResult struct {
 	E            int      `json:"e"`
 }
 
-// ===== Админ =====
-
 func (s *Service) CreateElection(ctx context.Context, title, desc string) (int, error) {
 	ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
 	defer cancel()
@@ -114,8 +112,6 @@ func (s *Service) GetElectionPublicInfo(ctx context.Context, id int) (PublicElec
 	}, nil
 }
 
-// ===== Голосование пользователем =====
-
 func (s *Service) SubmitVote(ctx context.Context, electionID int, login, ciphertext string) error {
 	ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
 	defer cancel()
@@ -144,8 +140,6 @@ func (s *Service) SubmitVote(ctx context.Context, electionID int, login, ciphert
 
 	return s.repo.InsertVote(ctx, electionID, userID, ciphertext)
 }
-
-// ===== Подсчёт =====
 
 func (s *Service) CountVotes(ctx context.Context, electionID int) (ElectionResult, error) {
 	ctx, cancel := context.WithTimeout(ctx, 30*time.Second)
@@ -208,7 +202,7 @@ func (s *Service) CountVotes(ctx context.Context, electionID int) (ElectionResul
 
 	tmp := new(big.Int)
 
-	// выносим степени 2
+	// 2
 	for {
 		tmp.Mod(Qbig, two)
 		if tmp.Cmp(zero) != 0 {
@@ -218,7 +212,7 @@ func (s *Service) CountVotes(ctx context.Context, electionID int) (ElectionResul
 		r++
 	}
 
-	// выносим степени 3
+	// 3
 	for {
 		tmp.Mod(Qbig, three)
 		if tmp.Cmp(zero) != 0 {
@@ -232,7 +226,7 @@ func (s *Service) CountVotes(ctx context.Context, electionID int) (ElectionResul
 	total := len(cts)
 	abstain := total - (r + p)
 	if abstain < 0 {
-		abstain = 0 // на всякий пожарный
+		abstain = 0
 	}
 
 	res := ElectionResult{

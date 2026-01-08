@@ -21,6 +21,8 @@ type Service struct {
 	connections sync.Map
 	wsMu        sync.Mutex
 	wsConns     map[*WSConn]struct{}
+
+	storageK string
 }
 
 type Connection struct {
@@ -38,11 +40,12 @@ type WSConn struct {
 	Send func([]byte) error
 }
 
-func NewService(repo *Repository, rdb *redis.Client) *Service {
+func NewService(repo *Repository, rdb *redis.Client, storageK string) *Service {
 	return &Service{
-		repo:    repo,
-		redis:   rdb,
-		wsConns: make(map[*WSConn]struct{}),
+		repo:     repo,
+		redis:    rdb,
+		wsConns:  make(map[*WSConn]struct{}),
+		storageK: storageK,
 	}
 }
 
@@ -89,25 +92,35 @@ func (s *Service) SaveMessage(ctx context.Context, login, from, text string, ts 
 	if ts == 0 {
 		ts = time.Now().UnixMilli()
 	}
-	msg := ServerMessage{
+
+	plainMsg := ServerMessage{
 		Login:     login,
 		From:      from,
 		Text:      text,
 		Timestamp: time.UnixMilli(ts),
 	}
 
-	b, err := json.Marshal(msg)
-	if err != nil {
-		return err
+	storeMsg := plainMsg
+
+	if s.storageK != "" {
+		ct, err := utils.EncryptAESFromK(s.storageK, text)
+		if err != nil {
+			return err
+		}
+		storeMsg.Text = ct
 	}
 
 	if s.redis != nil {
+		b, err := json.Marshal(storeMsg)
+		if err != nil {
+			return err
+		}
 		if err := s.redis.RPush(ctx, redisKey(login), b).Err(); err != nil {
 			return err
 		}
 	}
 
-	s.broadcastWS(msg)
+	s.broadcastWS(plainMsg)
 
 	return nil
 }
@@ -123,11 +136,21 @@ func (s *Service) GetHistory(ctx context.Context, login string) ([]ServerMessage
 	}
 
 	res := make([]ServerMessage, 0, len(vals))
+
 	for _, v := range vals {
 		var m ServerMessage
-		if err := json.Unmarshal([]byte(v), &m); err == nil {
-			res = append(res, m)
+		if err := json.Unmarshal([]byte(v), &m); err != nil {
+			continue
 		}
+
+		if s.storageK != "" && m.Text != "" {
+			pt, err := utils.DecryptAESFromK(s.storageK, m.Text)
+			if err == nil {
+				m.Text = pt
+			}
+		}
+
+		res = append(res, m)
 	}
 	return res, nil
 }

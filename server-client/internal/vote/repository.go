@@ -38,8 +38,6 @@ type ElectionResult struct {
 	CreatedAt    time.Time
 }
 
-// ===== elections =====
-
 func (r *Repository) CreateElection(ctx context.Context, title, desc, m string, e int, d string) (int, error) {
 	const q = `
 		INSERT INTO elections (title, description, status, rsa_m, rsa_e, rsa_d)
@@ -96,8 +94,6 @@ func (r *Repository) ListElections(ctx context.Context) ([]Election, error) {
 	return res, rows.Err()
 }
 
-// ===== users / votes =====
-
 func (r *Repository) GetUserIDByLogin(ctx context.Context, login string) (int, error) {
 	const q = `SELECT id FROM users WHERE login = $1`
 	var id int
@@ -151,8 +147,6 @@ func (r *Repository) ListCiphertexts(ctx context.Context, electionID int) ([]str
 	}
 	return res, rows.Err()
 }
-
-// ===== results =====
 
 func (r *Repository) SaveResult(ctx context.Context, res ElectionResult) error {
 	const q = `

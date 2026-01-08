@@ -55,10 +55,9 @@ func (s *GRPCServer) Chat(stream chatpb.ChatService_ChatServer) error {
 	s.service.RegisterConnection(login, conn)
 	defer s.service.UnregisterConnection(login)
 
-	// отправитель в gRPC
 	go func() {
 		for msg := range conn.Out {
-			// msg.Text у нас ciphertext
+
 			_ = stream.Send(&chatpb.ServerMessage{
 				From:       msg.From,
 				Ciphertext: msg.Text,
@@ -113,7 +112,6 @@ func (s *GRPCServer) Chat(stream chatpb.ChatService_ChatServer) error {
 
 		_ = s.service.SaveMessage(ctx, login, login, plain, ts)
 
-		// если хочешь echo — можно:
 		// _ = s.service.SendToClient(login, "[echo] "+plain)
 	}
 }

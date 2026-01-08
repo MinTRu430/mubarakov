@@ -17,8 +17,6 @@ func NewHandler(service *Service) *Handler {
 	return &Handler{service: service}
 }
 
-// ===== Admin DTOs =====
-
 type CreateElectionRequest struct {
 	Title       string `json:"title"`
 	Description string `json:"description"`
@@ -36,15 +34,11 @@ type CountElectionRequest struct {
 	ElectionID int `json:"election_id"`
 }
 
-// ===== Client DTOs =====
-
 type SubmitVoteRequest struct {
 	ElectionID int    `json:"election_id"`
 	Login      string `json:"login"`
 	Ciphertext string `json:"ciphertext"`
 }
-
-// ===== Admin Handlers =====
 
 func (h *Handler) CreateElection(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
@@ -195,9 +189,6 @@ func (h *Handler) GetResult(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(res)
 }
 
-// ===== Client Handlers =====
-
-// Info: публичная информация для клиента (m, e)
 func (h *Handler) Info(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet {
 		utils.WriteJSONError(w, http.StatusMethodNotAllowed, "only GET allowed")
@@ -225,7 +216,6 @@ func (h *Handler) Info(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(info)
 }
 
-// Submit: клиент отправляет зашифрованный голос
 func (h *Handler) Submit(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
 		utils.WriteJSONError(w, http.StatusMethodNotAllowed, "only POST allowed")
